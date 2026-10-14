@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Nature-inspired dark palette
@@ -25,30 +24,30 @@ class AppTheme {
       primary: accent,
       surface: bgSurface,
     ),
-    textTheme: GoogleFonts.dmSansTextTheme(ThemeData.dark().textTheme).copyWith(
-      displayLarge: GoogleFonts.dmMono(
+    textTheme: ThemeData.dark().textTheme.copyWith(
+      displayLarge: const TextStyle(
         fontSize: 64,
         fontWeight: FontWeight.w300,
         color: textPrimary,
         letterSpacing: -2,
       ),
-      displayMedium: GoogleFonts.dmMono(
+      displayMedium: const TextStyle(
         fontSize: 48,
         fontWeight: FontWeight.w300,
         color: textPrimary,
         letterSpacing: -1,
       ),
-      headlineMedium: GoogleFonts.dmMono(
+      headlineMedium: const TextStyle(
         fontSize: 28,
         fontWeight: FontWeight.w400,
         color: textSecondary,
       ),
-      bodyLarge: GoogleFonts.dmSans(
+      bodyLarge: const TextStyle(
         fontSize: 16,
         color: textSecondary,
         letterSpacing: 0.3,
       ),
-      bodyMedium: GoogleFonts.dmSans(
+      bodyMedium: const TextStyle(
         fontSize: 14,
         color: textDim,
       ),

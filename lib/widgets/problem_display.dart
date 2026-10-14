@@ -21,7 +21,7 @@ class ProblemDisplay extends StatelessWidget {
       children: [
         // Operation label
         Text(
-          _opLabel(problem.operation),
+          problem.operationLabel,
           style: const TextStyle(
             fontSize: 10,
             color: AppColors.textDim,
@@ -84,11 +84,4 @@ class ProblemDisplay extends StatelessWidget {
       ],
     );
   }
-
-  String _opLabel(Operation op) => switch (op) {
-    Operation.add => 'ADDITION',
-    Operation.subtract => 'SUBTRACTION',
-    Operation.multiply => 'MULTIPLICATION',
-    Operation.divide => 'DIVISION',
-  };
 }

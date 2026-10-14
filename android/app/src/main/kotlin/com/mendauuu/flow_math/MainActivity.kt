@@ -1,4 +1,4 @@
-package com.example.flow_math
+package com.mendauuu.flow_math
 
 import io.flutter.embedding.android.FlutterActivity
 
