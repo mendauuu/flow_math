@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../theme/palette.dart';
+
 import '../models/math_problem.dart';
-import '../utils/app_theme.dart';
 
 class ProblemDisplay extends StatelessWidget {
   final MathProblem problem;
@@ -16,68 +17,75 @@ class ProblemDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pal = context.palette;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         // Operation label
         Text(
           problem.operationLabel,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
-            color: AppColors.textDim,
+            color: pal.textDim,
             letterSpacing: 3,
           ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: 20),
 
         // The math problem
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
+          duration: Duration(milliseconds: 250),
           transitionBuilder: (child, anim) => FadeTransition(
             opacity: anim,
             child: SlideTransition(
               position: Tween<Offset>(
-                begin: const Offset(0, 0.1),
+                begin: Offset(0, 0.1),
                 end: Offset.zero,
               ).animate(anim),
               child: child,
             ),
           ),
-          child: Text(
-            problem.questionText,
+          // Long problems ("(12 + 15) × 9") shrink to stay on one line.
+          child: FittedBox(
             key: ValueKey(problem.questionText),
-            style: AppTextStyles.problemText,
+            fit: BoxFit.scaleDown,
+            child: Text(
+              problem.questionText,
+              maxLines: 1,
+              softWrap: false,
+              style: pal.problemText,
+            ),
           ),
         ),
 
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Container(
           width: 80,
           height: 1,
-          color: AppColors.textDim.withOpacity(0.2),
+          color: pal.textDim.withValues(alpha: 0.2),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: 20),
 
         // Answer input display
         AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          duration: Duration(milliseconds: 150),
+          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
                 color: inputBuffer.isEmpty
-                    ? AppColors.textDim.withOpacity(0.15)
-                    : AppColors.primary.withOpacity(0.5),
+                    ? pal.textDim.withValues(alpha: 0.15)
+                    : pal.accent.withValues(alpha: 0.5),
                 width: 1,
               ),
             ),
           ),
           child: Text(
             inputBuffer.isEmpty ? '?' : inputBuffer,
-            style: AppTextStyles.answerText.copyWith(
+            style: pal.answerText.copyWith(
               color: inputBuffer.isEmpty
-                  ? AppColors.textDim.withOpacity(0.3)
-                  : AppColors.primary,
+                  ? pal.textDim.withValues(alpha: 0.3)
+                  : pal.accent,
             ),
           ),
         ),

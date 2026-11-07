@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/palette.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/session_stats.dart';
 import '../services/settings_service.dart';
@@ -11,6 +12,7 @@ class StatsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pal = context.palette;
     final box = Hive.box<SessionStats>('sessions');
     final sessions = box.values.toList().reversed.toList();
 
@@ -23,14 +25,14 @@ class StatsScreen extends StatelessWidget {
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.oceanGradient),
+        decoration: BoxDecoration(gradient: pal.backdrop),
         child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Top bar ───────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                padding: EdgeInsets.fromLTRB(24, 20, 24, 0),
                 child: Row(
                   children: [
                     GestureDetector(
@@ -39,50 +41,50 @@ class StatsScreen extends StatelessWidget {
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.06),
+                          color: pal.textBright.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded,
-                            color: AppColors.textMid, size: 16),
+                        child: Icon(Icons.arrow_back_ios_new_rounded,
+                            color: pal.textMid, size: 16),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    const Text('HISTORY',
+                    SizedBox(width: 16),
+                    Text('HISTORY',
                         style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textDim,
+                            color: pal.textDim,
                             letterSpacing: 4,
                             fontWeight: FontWeight.w600)),
-                    const Spacer(),
+                    Spacer(),
                     GestureDetector(
                       onTap: () => Navigator.push(
                           context,
                           PageRouteBuilder(
-                            pageBuilder: (_, a, __) => const AnalyzeScreen(),
+                            pageBuilder: (_, a, __) => AnalyzeScreen(),
                             transitionsBuilder: (_, a, __, child) =>
                                 FadeTransition(opacity: a, child: child),
                             transitionDuration:
-                                const Duration(milliseconds: 400),
+                                Duration(milliseconds: 400),
                           )),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
+                        padding: EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.10),
+                          color: pal.accent.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                              color: AppColors.primary.withOpacity(0.25)),
+                              color: pal.accent.withValues(alpha: 0.25)),
                         ),
                         child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               Icon(Icons.insights_rounded,
-                                  color: AppColors.primary, size: 13),
+                                  color: pal.accent, size: 13),
                               SizedBox(width: 5),
                               Text('ANALYZE',
                                   style: TextStyle(
                                       fontSize: 9,
-                                      color: AppColors.primary,
+                                      color: pal.accent,
                                       letterSpacing: 2,
                                       fontWeight: FontWeight.w600)),
                             ]),
@@ -91,45 +93,45 @@ class StatsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
 
               // ── Summary bar ───────────────────────────────────────────────
               if (sessions.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: EdgeInsets.symmetric(horizontal: 24),
                   child: Row(
                     children: [
-                      _summaryChip('SESSIONS', '$totalSessions'),
-                      const SizedBox(width: 10),
-                      _summaryChip('TOTAL TIME', _fmtTime(totalTime)),
-                      const SizedBox(width: 10),
-                      _summaryChip(
-                          'AVG FOCUS', '${avgFocus.toStringAsFixed(0)}'),
+                      _summaryChip(pal, 'SESSIONS', '$totalSessions'),
+                      SizedBox(width: 10),
+                      _summaryChip(pal, 'TOTAL TIME', _fmtTime(totalTime)),
+                      SizedBox(width: 10),
+                      _summaryChip(pal,
+                          'AVG FOCUS', avgFocus.toStringAsFixed(0)),
                     ],
                   ),
                 ),
 
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
 
               // ── List ──────────────────────────────────────────────────────
               if (sessions.isEmpty)
-                const Expanded(
+                Expanded(
                   child: Center(
                     child: Text(
                       'No sessions yet.\nStep into the forest.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          color: AppColors.textDim, fontSize: 16, height: 1.7),
+                          color: pal.textDim, fontSize: 16, height: 1.7),
                     ),
                   ),
                 )
               else
                 Expanded(
                   child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: EdgeInsets.symmetric(horizontal: 24),
                     itemCount: sessions.length,
                     separatorBuilder: (_, __) => Divider(
-                        color: Colors.white.withOpacity(0.06), height: 1),
+                        color: pal.textBright.withValues(alpha: 0.06), height: 1),
                     itemBuilder: (_, i) => _SessionTile(stats: sessions[i]),
                   ),
                 ),
@@ -140,27 +142,27 @@ class StatsScreen extends StatelessWidget {
     );
   }
 
-  Widget _summaryChip(String label, String value) => Expanded(
+  Widget _summaryChip(Palette pal, String label, String value) => Expanded(
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
+            color: pal.textBright.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            border: Border.all(color: pal.textBright.withValues(alpha: 0.06)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(value,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w300,
-                      color: AppColors.textBright)),
-              const SizedBox(height: 2),
+                      color: pal.textBright)),
+              SizedBox(height: 2),
               Text(label,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 8,
-                      color: AppColors.textDim,
+                      color: pal.textDim,
                       letterSpacing: 1.5)),
             ],
           ),
@@ -179,6 +181,7 @@ class _SessionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pal = context.palette;
     final mins = stats.sessionDurationSeconds ~/ 60;
     final secs = stats.sessionDurationSeconds % 60;
     final timeStr =
@@ -193,11 +196,11 @@ class _SessionTile extends StatelessWidget {
     final scoreColor = score >= 70
         ? AppColors.correct
         : score >= 40
-            ? AppColors.primary
-            : AppColors.textDim;
+            ? pal.accent
+            : pal.textDim;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: EdgeInsets.symmetric(vertical: 14),
       child: Row(
         children: [
           // Focus score ring
@@ -207,7 +210,7 @@ class _SessionTile extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border:
-                  Border.all(color: scoreColor.withOpacity(0.35), width: 1.5),
+                  Border.all(color: scoreColor.withValues(alpha: 0.35), width: 1.5),
             ),
             child: Center(
               child: Text(score.toStringAsFixed(0),
@@ -217,34 +220,34 @@ class _SessionTile extends StatelessWidget {
                       color: scoreColor)),
             ),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(dateStr,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textDim,
+                        color: pal.textDim,
                         letterSpacing: 1)),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                     '$timeStr  ·  ${stats.totalProblems} problems  ·  ${stats.accuracy.toStringAsFixed(0)}%',
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textMid)),
+                    style: TextStyle(
+                        fontSize: 13, color: pal.textMid)),
               ],
             ),
           ),
           // Streak badge
           if (stats.maxStreak >= 3)
             Row(children: [
-              const Icon(Icons.local_fire_department,
-                  size: 12, color: AppColors.gold),
-              const SizedBox(width: 2),
+              Icon(Icons.local_fire_department,
+                  size: 12, color: pal.warm),
+              SizedBox(width: 2),
               Text('${stats.maxStreak}',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.gold,
+                      color: pal.warm,
                       fontWeight: FontWeight.w600)),
             ]),
         ],

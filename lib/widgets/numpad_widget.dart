@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../utils/app_theme.dart';
+import '../theme/palette.dart';
+
 
 class NumpadWidget extends StatelessWidget {
   final void Function(String) onTap;
@@ -15,7 +16,7 @@ class NumpadWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         children: _keys.map((row) {
           return Row(
@@ -41,6 +42,8 @@ class _NumKey extends StatefulWidget {
 }
 
 class _NumKeyState extends State<_NumKey> {
+  Palette get pal => context.palette;
+
   bool _pressed = false;
 
   bool get _isAction => widget.label == '✓' || widget.label == '⌫';
@@ -57,23 +60,22 @@ class _NumKeyState extends State<_NumKey> {
       },
       onTapCancel: () => setState(() => _pressed = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 80),
-        margin: const EdgeInsets.all(4),
+        duration: Duration(milliseconds: 90),
+        margin: EdgeInsets.all(4),
         height: 58,
+        // Keys are made of the theme's matte surface, in the theme's shape.
         decoration: BoxDecoration(
-          color: _pressed
-              ? (isConfirm
-                  ? AppColors.primary.withOpacity(0.25)
-                  : Colors.white.withOpacity(0.06))
-              : (isConfirm
-                  ? AppColors.primary.withOpacity(0.08)
-                  : Colors.white.withOpacity(0.03)),
-          borderRadius: BorderRadius.circular(12),
+          color: Color.alphaBlend(
+            isConfirm
+                ? pal.accent.withValues(alpha: _pressed ? 0.32 : 0.16)
+                : pal.textBright.withValues(alpha: _pressed ? 0.10 : 0.03),
+            pal.surface.withValues(alpha: 0.62),
+          ),
+          borderRadius: pal.corners(0.65),
           border: Border.all(
             color: isConfirm
-                ? AppColors.primary.withOpacity(_pressed ? 0.4 : 0.15)
-                : Colors.white.withOpacity(0.04),
-            width: 1,
+                ? pal.accent.withValues(alpha: _pressed ? 0.6 : 0.35)
+                : pal.line,
           ),
         ),
         child: Center(
@@ -83,10 +85,10 @@ class _NumKeyState extends State<_NumKey> {
               fontSize: _isAction ? 18 : 22,
               fontWeight: FontWeight.w300,
               color: isConfirm
-                  ? AppColors.primary
+                  ? pal.accent
                   : widget.label == '⌫'
-                      ? AppColors.textDim
-                      : AppColors.textBright,
+                      ? pal.textDim
+                      : pal.textBright,
             ),
           ),
         ),

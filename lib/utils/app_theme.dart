@@ -10,6 +10,8 @@ class AppColors {
   static const primary = Color(0xFF6EC6AA);
   static const primaryDim = Color(0xFF3D8B72);
   static const gold = Color(0xFFD4A853);
+  static const ember = Color(0xFFE8A27A); // Focus — candlelight
+  static const lavender = Color(0xFFB5A8F0); // Meditation
 
   // Text
   static const textBright = Color(0xFFF0F4F8);

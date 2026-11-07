@@ -145,6 +145,13 @@ class FlowEngine {
     }
   }
 
+  /// Fresh start at a chosen [level] (1–10) — used for Flow State mode with
+  /// the "Starting difficulty" setting.
+  void startAt(double level) {
+    resetToEasy();
+    _level = level.clamp(1.0, 10.0);
+  }
+
   void resetToEasy() {
     _level = 1.5;
     _momentum = 0.0;

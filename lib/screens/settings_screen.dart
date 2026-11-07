@@ -1,13 +1,18 @@
-import 'dart:math';
-import 'package:flow_math/main.dart';
-import 'package:flow_math/screens/paywall_screen.dart';
 import 'package:flutter/material.dart';
+import '../theme/palette.dart';
+import '../widgets/themed.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../services/settings_service.dart';
+import '../models/session_stats.dart';
+import '../services/app_icon_service.dart';
 import '../services/audio_service.dart';
+import '../services/focus_store.dart';
+import '../services/meditation_log.dart';
+import '../services/notification_service.dart';
+import '../services/settings_service.dart';
 import '../utils/app_theme.dart';
-import '../main.dart' show purchaseService;
+import '../widgets/animated_background.dart';
+import '../widgets/nature_switch.dart';
 
 class SettingsScreen extends StatefulWidget {
   final SettingsService settings;
@@ -23,101 +28,185 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _bgCtrl;
+class _SettingsScreenState extends State<SettingsScreen> {
+  Palette get pal => context.palette;
 
   SettingsService get s => widget.settings;
   AudioService get a => widget.audio;
 
-  @override
-  void initState() {
-    super.initState();
-    _bgCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 20),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _bgCtrl.dispose();
-    super.dispose();
+  void _tick() {
+    if (s.haptics) HapticFeedback.selectionClick();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Animated forest background (same as home)
-          AnimatedBuilder(
-            animation: _bgCtrl,
-            builder: (_, __) => CustomPaint(
-              painter: _SettingsBgPainter(_bgCtrl.value),
-              child: const SizedBox.expand(),
-            ),
-          ),
-          Container(color: Colors.black.withOpacity(0.55)),
-
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _topBar(context),
-                Expanded(
-                  child: ListenableBuilder(
-                    listenable: s,
-                    builder: (_, __) => ListView(
-                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+      body: ListenableBuilder(
+        listenable: s,
+        builder: (context, _) => Stack(
+          children: [
+            // Live preview of the chosen background
+            AnimatedBackground(theme: s.bgTheme),
+            ThemedScrim(0.5),
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _topBar(context),
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.fromLTRB(24, 8, 24, 40),
                       children: [
-                        _sectionLabel('SOUND'),
-                        _soundModeGrid(),
-                        const SizedBox(height: 20),
-                        _volumeRow(),
-                        const SizedBox(height: 32),
                         _sectionLabel('BACKGROUND'),
-                        _bgThemeGrid(),
-                        const SizedBox(height: 32),
+                        _backgroundGrid(),
+                        SizedBox(height: 14),
+                        _toggleTile(
+                          icon: Icons.palette_outlined,
+                          label: 'Match buttons & colours',
+                          sub: s.uiFollowsBackground
+                              ? 'Buttons, colours and shapes change with the background'
+                              : 'Pick your own interface style below',
+                          value: s.uiFollowsBackground,
+                          onChanged: (v) {
+                            _tick();
+                            s.setUiFollowsBackground(v);
+                          },
+                        ),
+                        AnimatedSize(
+                          duration: Duration(milliseconds: 300),
+                          alignment: Alignment.topCenter,
+                          child: s.uiFollowsBackground
+                              ? SizedBox(width: double.infinity)
+                              : Padding(
+                                  padding: EdgeInsets.only(top: 20),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _sectionLabel('INTERFACE STYLE'),
+                                      _styleGrid(),
+                                    ],
+                                  ),
+                                ),
+                        ),
+                        SizedBox(height: 32),
+                        _sectionLabel('APP ICON'),
+                        _appIconGrid(),
+                        SizedBox(height: 10),
+                        Text(
+                          AppIconService.changesHomeScreen
+                              ? 'Your home-screen icon changes when you leave the app.'
+                              : 'Shown inside the app.',
+                          style: TextStyle(fontSize: 11, color: pal.textDim),
+                        ),
+                        SizedBox(height: 32),
+                        _sectionLabel('SOUND'),
+                        _soundGrid(),
+                        SizedBox(height: 20),
+                        _volumeRow(),
+                        SizedBox(height: 32),
                         _sectionLabel('SESSION'),
-                        _sessionTargetRow(),
-                        const SizedBox(height: 16),
+                        _sessionLengthRow(),
+                        SizedBox(height: 20),
+                        _startLevelTile(),
+                        SizedBox(height: 12),
                         _toggleTile(
                           icon: Icons.flash_on_rounded,
                           label: 'Show streak counter',
                           sub: 'Flame icon while on a roll',
                           value: s.showStreak,
-                          onChanged: s.setShowStreak,
+                          onChanged: (v) {
+                            _tick();
+                            s.setShowStreak(v);
+                          },
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _toggleTile(
-                          icon: Icons.keyboard_rounded,
-                          label: 'Auto-focus keyboard',
-                          sub: 'Input ready the moment a problem appears',
-                          value: s.autoStart,
-                          onChanged: s.setAutoStart,
+                          icon: Icons.bolt_rounded,
+                          label: 'Auto-submit answers',
+                          sub: 'Correct answers count instantly, no need to tap ✓',
+                          value: s.autoSubmit,
+                          onChanged: (v) {
+                            _tick();
+                            s.setAutoSubmit(v);
+                          },
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: 32),
+                        _sectionLabel('REMINDERS'),
+                        _toggleTile(
+                          icon: Icons.notifications_none_rounded,
+                          label: 'Daily reminder',
+                          sub: s.remindDaily
+                              ? 'Every day at ${_reminderTime(context)}'
+                              : 'A gentle nudge to take a focus break',
+                          value: s.remindDaily,
+                          onChanged: (v) => _setReminder(v, s.setRemindDaily),
+                        ),
+                        if (s.remindDaily) ...[
+                          SizedBox(height: 8),
+                          _timeTile(context),
+                        ],
+                        SizedBox(height: 12),
+                        _toggleTile(
+                          icon: Icons.local_fire_department_outlined,
+                          label: 'Streak saver',
+                          sub: '8 PM alert when your daily streak is at risk',
+                          value: s.remindStreak,
+                          onChanged: (v) => _setReminder(v, s.setRemindStreak),
+                        ),
+                        SizedBox(height: 12),
+                        _toggleTile(
+                          icon: Icons.insights_rounded,
+                          label: 'Weekly summary',
+                          sub: 'Sunday morning recap of your week',
+                          value: s.remindWeekly,
+                          onChanged: (v) => _setReminder(v, s.setRemindWeekly),
+                        ),
+                        SizedBox(height: 32),
                         _sectionLabel('FEEL'),
                         _toggleTile(
                           icon: Icons.vibration_rounded,
                           label: 'Haptic feedback',
                           sub: 'Subtle vibration on tap',
                           value: s.haptics,
-                          onChanged: s.setHaptics,
+                          onChanged: (v) {
+                            s.setHaptics(v);
+                            _tick();
+                          },
                         ),
-                        const SizedBox(height: 40),
-                        if (!purchaseService.isPro) _proTile(context),
-                        if (!purchaseService.isPro) const SizedBox(height: 12),
-                        _resetTile(context),
+                        SizedBox(height: 12),
+                        _toggleTile(
+                          icon: Icons.air_rounded,
+                          label: 'Breath cues',
+                          sub: 'A soft tap at each breath while meditating — '
+                              'practise with eyes closed',
+                          value: s.medCues,
+                          onChanged: (v) {
+                            _tick();
+                            s.setMedCues(v);
+                          },
+                        ),
+                        SizedBox(height: 32),
+                        _sectionLabel('DATA'),
+                        _historyTile(context),
+                        SizedBox(height: 12),
+                        _actionTile(
+                          icon: Icons.restart_alt_rounded,
+                          color: pal.textMid,
+                          label: 'Reset settings',
+                          sub: 'Restore sound, background and session defaults',
+                          onTap: () => _confirmResetSettings(context),
+                        ),
+                        SizedBox(height: 36),
+                        _footer(),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -125,83 +214,319 @@ class _SettingsScreenState extends State<SettingsScreen>
   // ── Top bar ───────────────────────────────────────────────────────────────
   Widget _topBar(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  color: AppColors.textMid, size: 16),
-            ),
+      padding: EdgeInsets.only(bottom: 12),
+      child: ThemedTopBar(
+          title: 'SETTINGS', onBack: () => Navigator.pop(context)),
+    );
+  }
+
+  // ── Background picker ─────────────────────────────────────────────────────
+  Widget _backgroundGrid() {
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 0.75,
+      children: kBackgroundThemes.map(_backgroundTile).toList(),
+    );
+  }
+
+  Widget _backgroundTile(BackgroundTheme b) {
+    final active = s.bgTheme == b.id;
+    return Pressable(
+      onTap: () {
+        _tick();
+        s.setBgTheme(b.id);
+      },
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 300),
+        decoration: BoxDecoration(
+          borderRadius: pal.corners(0.8),
+          border: Border.all(
+            color: active ? pal.accent : pal.line,
+            width: active ? 2 : 1,
           ),
-          const SizedBox(width: 16),
-          const Text('SETTINGS',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textDim,
-                letterSpacing: 4,
-                fontWeight: FontWeight.w600,
-              )),
+        ),
+        child: ClipRRect(
+          borderRadius: pal.corners(0.7),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              BackgroundPreview(theme: b.id),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(8, 16, 8, 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.75),
+                      ],
+                    ),
+                  ),
+                  child: Text(
+                    '${b.emoji} ${b.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: active
+                          ? pal.accent
+                          : pal.textBright.withValues(alpha: 0.85),
+                      fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ),
+              if (active)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: pal.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child:
+                        Icon(Icons.check, size: 12, color: Colors.black),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Interface style (when not matching the background) ───────────────────
+  Widget _styleGrid() {
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.45,
+      children: kBackgroundThemes.map(_styleTile).toList(),
+    );
+  }
+
+  /// Each tile is drawn in its own style's material, as a preview.
+  Widget _styleTile(BackgroundTheme b) {
+    final sp = paletteFor(b.id);
+    final active = s.uiStyle == b.id;
+    return Pressable(
+      onTap: () {
+        _tick();
+        s.setUiStyle(b.id);
+      },
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 250),
+        padding: EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(
+              sp.accent.withValues(alpha: active ? 0.22 : 0.08), sp.surface),
+          borderRadius: BorderRadius.circular(sp.radius * 0.6),
+          border: Border.all(
+            color: active ? sp.accent : sp.accent.withValues(alpha: 0.25),
+            width: active ? 1.6 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                for (final c in [sp.accent, sp.warm, sp.calm])
+                  Container(
+                    width: 10,
+                    height: 10,
+                    margin: EdgeInsets.only(right: 4),
+                    decoration:
+                        BoxDecoration(color: c, shape: BoxShape.circle),
+                  ),
+                Spacer(),
+                if (active) Icon(Icons.check_rounded, size: 14, color: sp.accent),
+              ],
+            ),
+            Text(b.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: active ? sp.accent : sp.textMid,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── App icon ──────────────────────────────────────────────────────────────
+  Widget _appIconGrid() {
+    return ValueListenableBuilder<String>(
+      valueListenable: AppIconService.current,
+      builder: (context, chosen, _) => GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.92,
+        children: [
+          for (final icon in kAppIcons) _appIconTile(icon, icon.id == chosen),
         ],
       ),
     );
   }
 
-  // ── Sound mode grid ───────────────────────────────────────────────────────
-  Widget _soundModeGrid() {
-    final modes = [
-      (SoundMode.off, '🔇', 'Silent'),
-      (SoundMode.rain, '🌧', 'Rain'),
-      (SoundMode.thunder, '⛈', 'Thunder'),
-      (SoundMode.wind, '🌬', 'Wind'),
-      (SoundMode.forest, '🌲', 'Forest'),
-      (SoundMode.birds, '🐦', 'Birds'),
-      (SoundMode.river, '🏞', 'River'),
-      (SoundMode.stream, '💧', 'Stream'),
-    ];
+  /// Each icon sits on a mini "home screen" made from the current scene.
+  Widget _appIconTile(AppIconOption icon, bool active) {
+    return Pressable(
+      onTap: () => _chooseIcon(icon),
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 300),
+        padding: EdgeInsets.all(6),
+        decoration: active ? pal.card(active: true) : pal.panel(),
+        child: Column(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: pal.corners(0.7),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    BackgroundPreview(theme: s.bgTheme),
+                    ColoredBox(color: pal.scrim.withValues(alpha: 0.2)),
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedScale(
+                            scale: active ? 1.08 : 1,
+                            duration: Duration(milliseconds: 350),
+                            curve: Curves.easeOutBack,
+                            child: Container(
+                              width: 58,
+                              height: 58,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(15),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.35),
+                                    blurRadius: 10,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(15),
+                                child: Image.asset(icon.asset,
+                                    fit: BoxFit.cover,
+                                    filterQuality: FilterQuality.medium),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text('Flow Math',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(color: Colors.black54, blurRadius: 4)
+                                ],
+                              )),
+                        ],
+                      ),
+                    ),
+                    if (active)
+                      Positioned(
+                        top: 7,
+                        right: 7,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                              color: pal.accent, shape: BoxShape.circle),
+                          child:
+                              Icon(Icons.check, size: 12, color: Colors.black),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(icon.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: active ? pal.accent : pal.textMid)),
+            SizedBox(height: 1),
+            Text(icon.tagline,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10, color: pal.textDim)),
+            SizedBox(height: 4),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _chooseIcon(AppIconOption icon) async {
+    if (AppIconService.current.value == icon.id) return;
+    _tick();
+    await AppIconService.set(icon.id);
+    if (!mounted) return;
+    _toast(AppIconService.changesHomeScreen
+        ? '${icon.name} it is ✨  The home-screen icon changes when you leave the app.'
+        : '${icon.name} it is ✨');
+  }
+
+  // ── Sound ─────────────────────────────────────────────────────────────────
+  Widget _soundGrid() {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: modes.map((m) {
-        final active = s.soundMode == m.$1;
+      children: SoundMode.values.map((m) {
+        final active = s.soundMode == m;
         return GestureDetector(
           onTap: () {
-            if (s.haptics) HapticFeedback.selectionClick();
-            s.setSoundMode(m.$1);
-            a.setMode(m.$1);
+            _tick();
+            s.setSoundMode(m);
+            a.setMode(m);
             a.setVolume(s.volume);
           },
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: active
-                  ? AppColors.primary.withOpacity(0.15)
-                  : Colors.white.withOpacity(0.04),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: active
-                    ? AppColors.primary.withOpacity(0.45)
-                    : Colors.white.withOpacity(0.07),
-                width: 1,
-              ),
-            ),
+            duration: Duration(milliseconds: 220),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: _chipDecoration(active, radius: 12),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(m.$2, style: const TextStyle(fontSize: 14)),
-                const SizedBox(width: 8),
-                Text(m.$3,
+                Text(AudioService.emojiOf(m),
+                    style: TextStyle(fontSize: 14)),
+                SizedBox(width: 8),
+                Text(AudioService.nameOf(m),
                     style: TextStyle(
                       fontSize: 12,
-                      color: active ? AppColors.primary : AppColors.textDim,
+                      color: active ? pal.accent : pal.textDim,
                       fontWeight: active ? FontWeight.w600 : FontWeight.w400,
                       letterSpacing: 0.5,
                     )),
@@ -213,141 +538,79 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  // ── Volume slider ─────────────────────────────────────────────────────────
   Widget _volumeRow() {
+    final muted = s.soundMode == SoundMode.off;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(Icons.volume_down_rounded,
-                color: AppColors.textDim, size: 18),
+            Icon(Icons.volume_down_rounded,
+                color: pal.textDim, size: 18),
             Expanded(
-              child: SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 2,
-                  thumbShape:
-                      const RoundSliderThumbShape(enabledThumbRadius: 7),
-                  activeTrackColor: AppColors.primary,
-                  inactiveTrackColor: Colors.white.withOpacity(0.08),
-                  thumbColor: AppColors.primary,
-                  overlayColor: AppColors.primary.withOpacity(0.12),
-                ),
-                child: Slider(
-                  value: s.volume,
-                  min: 0,
-                  max: 1,
-                  onChanged: (v) {
-                    s.setVolume(v);
-                    a.setVolume(v);
-                  },
-                ),
+              child: _slider(
+                value: s.volume,
+                min: 0,
+                max: 1,
+                onChanged: (v) {
+                  s.setVolume(v);
+                  a.setVolume(v);
+                },
               ),
             ),
-            const Icon(Icons.volume_up_rounded,
-                color: AppColors.textDim, size: 18),
+            Icon(Icons.volume_up_rounded,
+                color: pal.textDim, size: 18),
           ],
         ),
         Padding(
-          padding: const EdgeInsets.only(left: 4),
+          padding: EdgeInsets.only(left: 4),
           child: Text(
-            'Volume  ${(s.volume * 100).round()}%',
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.textDim, letterSpacing: 0.5),
+            muted
+                ? 'Volume  ${(s.volume * 100).round()}%  ·  pick a sound to hear it'
+                : 'Volume  ${(s.volume * 100).round()}%',
+            style: TextStyle(
+                fontSize: 11, color: pal.textDim, letterSpacing: 0.5),
           ),
         ),
       ],
     );
   }
 
-  // ── Background theme grid ─────────────────────────────────────────────────
-  Widget _bgThemeGrid() {
-    final themes = [
-      ('forest', '🌲', 'Forest', const Color(0xFF0A2018)),
-      ('ocean', '🌊', 'Ocean', const Color(0xFF08182A)),
-      ('desert', '🌙', 'Desert', const Color(0xFF1E1408)),
-    ];
-    return Row(
-      children: themes.map((t) {
-        final active = s.bgTheme == t.$1;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () {
-              if (s.haptics) HapticFeedback.selectionClick();
-              s.setBgTheme(t.$1);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              margin: EdgeInsets.only(right: t.$1 == themes.last.$1 ? 0 : 10),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: active ? t.$4.withOpacity(0.8) : t.$4.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: active
-                      ? AppColors.primary.withOpacity(0.45)
-                      : Colors.white.withOpacity(0.06),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Text(t.$2, style: const TextStyle(fontSize: 22)),
-                  const SizedBox(height: 6),
-                  Text(t.$3,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: active ? AppColors.primary : AppColors.textDim,
-                        letterSpacing: 1.5,
-                        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                      )),
-                ],
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // ── Session target ────────────────────────────────────────────────────────
-  Widget _sessionTargetRow() {
-    final options = [0, 5, 10, 20, 30];
+  // ── Session ───────────────────────────────────────────────────────────────
+  Widget _sessionLengthRow() {
+    const options = SettingsService.sessionTargets;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Session length',
-            style: TextStyle(fontSize: 13, color: AppColors.textMid)),
-        const SizedBox(height: 10),
+        Text('Session length',
+            style: TextStyle(fontSize: 13, color: pal.textMid)),
+        SizedBox(height: 2),
+        Text(
+          s.sessionTarget == 0
+              ? 'No limit — end whenever you like'
+              : 'Ends automatically after ${s.sessionTarget} minutes',
+          style: TextStyle(fontSize: 11, color: pal.textDim),
+        ),
+        SizedBox(height: 10),
         Row(
           children: options.map((mins) {
             final active = s.sessionTarget == mins;
-            final label = mins == 0 ? '∞' : '${mins}m';
             return Expanded(
               child: GestureDetector(
                 onTap: () {
-                  if (s.haptics) HapticFeedback.selectionClick();
+                  _tick();
                   s.setSessionTarget(mins);
                 },
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? AppColors.primary.withOpacity(0.15)
-                        : Colors.white.withOpacity(0.04),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: active
-                          ? AppColors.primary.withOpacity(0.4)
-                          : Colors.white.withOpacity(0.06),
-                    ),
-                  ),
+                  duration: Duration(milliseconds: 180),
+                  margin: EdgeInsets.only(right: mins == options.last ? 0 : 8),
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  decoration: _chipDecoration(active, radius: 10),
                   child: Center(
-                    child: Text(label,
+                    child: Text(mins == 0 ? '∞' : '${mins}m',
                         style: TextStyle(
                           fontSize: 13,
-                          color: active ? AppColors.primary : AppColors.textDim,
+                          color: active ? pal.accent : pal.textDim,
                           fontWeight:
                               active ? FontWeight.w600 : FontWeight.w400,
                         )),
@@ -361,7 +624,219 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  // ── Toggle tile ───────────────────────────────────────────────────────────
+  Widget _startLevelTile() {
+    final level = s.startLevel;
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 14, 8, 4),
+      decoration: _tileDecoration(),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.trending_up_rounded,
+                  color: pal.textDim, size: 18),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Starting difficulty',
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: pal.textMid,
+                            fontWeight: FontWeight.w500)),
+                    SizedBox(height: 2),
+                    Text('Flow State starts here, then adapts to you',
+                        style:
+                            TextStyle(fontSize: 11, color: pal.textDim)),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Text('$level · ${_levelName(level)}',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: pal.accent,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          _slider(
+            value: level.toDouble(),
+            min: 1,
+            max: 10,
+            divisions: 9,
+            onChanged: (v) {
+              final n = v.round();
+              if (n == s.startLevel) return;
+              _tick();
+              s.setStartLevel(n);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _levelName(int level) => switch (level) {
+        <= 2 => 'Gentle',
+        <= 4 => 'Steady',
+        <= 6 => 'Challenging',
+        <= 8 => 'Hard',
+        _ => 'Expert',
+      };
+
+  // ── Reminders ─────────────────────────────────────────────────────────────
+  String _reminderTime(BuildContext context) =>
+      TimeOfDay(hour: s.remindHour, minute: s.remindMinute).format(context);
+
+  Future<void> _setReminder(bool on, Future<void> Function(bool) save) async {
+    _tick();
+    if (on) {
+      final granted = await NotificationService.requestPermission();
+      if (!granted) {
+        _toast('Notifications are blocked for Flow Math. '
+            'Allow them in your phone settings first.');
+        return;
+      }
+    }
+    await save(on);
+  }
+
+  Widget _timeTile(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _pickTime(context),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: _tileDecoration(),
+        child: Row(
+          children: [
+            Icon(Icons.schedule_rounded,
+                color: pal.textDim, size: 18),
+            SizedBox(width: 14),
+            Expanded(
+              child: Text('Reminder time',
+                  style: TextStyle(
+                      fontSize: 14,
+                      color: pal.textMid,
+                      fontWeight: FontWeight.w500)),
+            ),
+            Text(_reminderTime(context),
+                style: TextStyle(
+                    fontSize: 14,
+                    color: pal.accent,
+                    fontWeight: FontWeight.w600)),
+            SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded,
+                color: pal.textDim, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickTime(BuildContext context) async {
+    _tick();
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: s.remindHour, minute: s.remindMinute),
+      helpText: 'DAILY REMINDER',
+    );
+    if (picked == null) return;
+    await s.setRemindTime(picked.hour, picked.minute);
+    if (mounted) _toast('Daily reminder set for ${_reminderTime(this.context)}');
+  }
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  Widget _historyTile(BuildContext context) {
+    final count = Hive.box<SessionStats>('sessions').length +
+        MeditationLog.sessions +
+        FocusLog.sessions;
+    return _actionTile(
+      icon: Icons.delete_outline_rounded,
+      color: AppColors.incorrect,
+      label: 'Clear history',
+      sub: count == 0
+          ? 'No sessions saved yet'
+          : '$count session${count == 1 ? '' : 's'} saved on this device',
+      onTap: count == 0 ? null : () => _confirmClearHistory(context),
+    );
+  }
+
+  Future<void> _confirmClearHistory(BuildContext context) async {
+    final ok = await _confirm(
+      context,
+      title: 'Clear history?',
+      body: 'All math, focus and meditation sessions will be deleted '
+          '(parked thoughts are kept). '
+          'This cannot be undone.',
+      action: 'Delete',
+      color: AppColors.incorrect,
+    );
+    if (!ok) return;
+    await Hive.box<SessionStats>('sessions').clear();
+    await MeditationLog.clear();
+    await FocusLog.clear();
+    await NotificationService.sync(); // streak & weekly text depend on it
+    if (!mounted) return;
+    setState(() {});
+    _toast('History cleared');
+  }
+
+  Future<void> _confirmResetSettings(BuildContext context) async {
+    final ok = await _confirm(
+      context,
+      title: 'Reset settings?',
+      body: 'Sound, background, session and feel settings go back to their '
+          'defaults. Your history and reminders are kept.',
+      action: 'Reset',
+      color: pal.accent,
+    );
+    if (!ok) return;
+    await s.resetToDefaults();
+    a.setMode(s.soundMode);
+    a.setVolume(s.volume);
+    if (mounted) _toast('Settings restored');
+  }
+
+  Future<bool> _confirm(
+    BuildContext context, {
+    required String title,
+    required String body,
+    required String action,
+    required Color color,
+  }) =>
+      showThemedConfirm(context,
+          title: title,
+          body: body,
+          action: action,
+          actionIsSafe: true,
+          tint: color);
+
+  void _toast(String message) {
+    if (mounted) showThemedToast(context, message);
+  }
+
+  Widget _footer() {
+    return Center(
+      child: Column(
+        children: [
+          Text('FLOW MATH',
+              style: TextStyle(
+                  fontSize: 10,
+                  color: pal.accent,
+                  letterSpacing: 3,
+                  fontWeight: FontWeight.w600)),
+          SizedBox(height: 6),
+          Text('Made for focus · Your data stays on this device',
+              style: TextStyle(fontSize: 11, color: pal.textDim)),
+        ],
+      ),
+    );
+  }
+
+  // ── Shared pieces ─────────────────────────────────────────────────────────
   Widget _toggleTile({
     required IconData icon,
     required String label,
@@ -369,155 +844,123 @@ class _SettingsScreenState extends State<SettingsScreen>
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.textDim, size: 18),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textMid,
-                        fontWeight: FontWeight.w500)),
-                const SizedBox(height: 2),
-                Text(sub,
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textDim)),
-              ],
-            ),
-          ),
-          _NatureSwitch(value: value, onChanged: onChanged),
-        ],
-      ),
-    );
-  }
-
-  // ── Reset tile ────────────────────────────────────────────────────────────
-  Widget _proTile(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (_, a, __) =>
-                PaywallScreen(purchases: purchaseService, dismissible: true),
-            transitionsBuilder: (_, a, __, child) =>
-                FadeTransition(opacity: a, child: child),
-            transitionDuration: const Duration(milliseconds: 400),
-          )),
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChanged(!value),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.gold.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.gold.withOpacity(0.22)),
-        ),
-        child: Row(children: const [
-          Text('🏆', style: TextStyle(fontSize: 18)),
-          SizedBox(width: 14),
-          Expanded(
-              child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Upgrade to Pro',
-                  style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.gold,
-                      fontWeight: FontWeight.w500)),
-              SizedBox(height: 2),
-              Text('Analytics · Sounds · Streak calendar · \$4.99/mo',
-                  style: TextStyle(fontSize: 11, color: AppColors.textDim)),
-            ],
-          )),
-          Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.gold),
-        ]),
-      ),
-    );
-  }
-
-  Widget _resetTile(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _confirmReset(context),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.incorrect.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.incorrect.withOpacity(0.15)),
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: _tileDecoration(),
         child: Row(
-          children: const [
-            Icon(Icons.delete_outline_rounded,
-                color: AppColors.incorrect, size: 18),
+          children: [
+            Icon(icon, color: pal.textDim, size: 18),
             SizedBox(width: 14),
-            Text('Clear all session history',
-                style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.incorrect,
-                    fontWeight: FontWeight.w500)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: TextStyle(
+                          fontSize: 14,
+                          color: pal.textMid,
+                          fontWeight: FontWeight.w500)),
+                  SizedBox(height: 2),
+                  Text(sub,
+                      style: TextStyle(
+                          fontSize: 11, color: pal.textDim)),
+                ],
+              ),
+            ),
+            SizedBox(width: 12),
+            NatureSwitch(value: value, onChanged: onChanged),
           ],
         ),
       ),
     );
   }
 
-  void _confirmReset(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF111E18),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Clear history?',
-            style: TextStyle(color: AppColors.textBright, fontSize: 18)),
-        content: const Text(
-            'All session data will be deleted. This cannot be undone.',
-            style: TextStyle(color: AppColors.textDim, fontSize: 13)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textDim)),
-          ),
-          TextButton(
-            onPressed: () {
-              // Hive clear
-              final box = Hive.box('sessions');
-              box.clear();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('History cleared',
-                      style: TextStyle(color: AppColors.textMid)),
-                  backgroundColor: Color(0xFF111E18),
-                  duration: Duration(seconds: 2),
+  Widget _actionTile({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required String sub,
+    required VoidCallback? onTap,
+  }) {
+    final enabled = onTap != null;
+    return Pressable(
+      onTap: onTap,
+      child: AnimatedOpacity(
+        duration: Duration(milliseconds: 200),
+        opacity: enabled ? 1 : 0.5,
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 300),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: pal.card(tint: color),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 14,
+                            color: color,
+                            fontWeight: FontWeight.w500)),
+                    SizedBox(height: 2),
+                    Text(sub,
+                        style: TextStyle(
+                            fontSize: 11, color: pal.textDim)),
+                  ],
                 ),
-              );
-            },
-            child: const Text('Delete',
-                style: TextStyle(color: AppColors.incorrect)),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  Widget _slider({
+    required double value,
+    required double min,
+    required double max,
+    int? divisions,
+    required ValueChanged<double> onChanged,
+  }) {
+    return SliderTheme(
+      data: SliderThemeData(
+        trackHeight: 2,
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 7),
+        activeTrackColor: pal.accent,
+        inactiveTrackColor: pal.textBright.withValues(alpha: 0.08),
+        thumbColor: pal.accent,
+        overlayColor: pal.accent.withValues(alpha: 0.12),
+        tickMarkShape: SliderTickMarkShape.noTickMark,
+      ),
+      child: Slider(
+        value: value.clamp(min, max),
+        min: min,
+        max: max,
+        divisions: divisions,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  BoxDecoration _tileDecoration() => pal.panel();
+
+  BoxDecoration _chipDecoration(bool active, {required double radius}) =>
+      pal.chip(active);
+
   Widget _sectionLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: 12),
       child: Text(text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10,
-            color: AppColors.textDim,
+            color: pal.textDim,
             letterSpacing: 3,
             fontWeight: FontWeight.w600,
           )),
@@ -525,183 +968,3 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 }
 
-// ── Custom nature-style toggle switch ─────────────────────────────────────────
-class _NatureSwitch extends StatelessWidget {
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  const _NatureSwitch({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onChanged(!value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        width: 44,
-        height: 26,
-        decoration: BoxDecoration(
-          color: value
-              ? AppColors.primary.withOpacity(0.25)
-              : Colors.white.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: value
-                ? AppColors.primary.withOpacity(0.5)
-                : Colors.white.withOpacity(0.1),
-          ),
-        ),
-        child: AnimatedAlign(
-          duration: const Duration(milliseconds: 220),
-          alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.all(3),
-            width: 18,
-            height: 18,
-            decoration: BoxDecoration(
-              color: value ? AppColors.primary : AppColors.textDim,
-              shape: BoxShape.circle,
-              boxShadow: value
-                  ? [
-                      BoxShadow(
-                          color: AppColors.primary.withOpacity(0.4),
-                          blurRadius: 6)
-                    ]
-                  : [],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Settings background painter (ocean/desert/forest themed) ─────────────────
-class _SettingsBgPainter extends CustomPainter {
-  final double t;
-  _SettingsBgPainter(this.t);
-
-  @override
-  void paint(Canvas canvas, Size sz) {
-    // Sky
-    canvas.drawRect(
-        Offset.zero & sz,
-        Paint()
-          ..shader = const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF010609), Color(0xFF04101A), Color(0xFF061822)],
-          ).createShader(Offset.zero & sz));
-
-    // Moon (left side for variety)
-    final cx = sz.width * 0.22;
-    final cy = sz.height * 0.20;
-    canvas.drawCircle(
-        Offset(cx, cy),
-        sz.width * 0.3,
-        Paint()
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 50)
-          ..color = const Color(0xFF1A4A30).withOpacity(0.10));
-    canvas.drawCircle(
-        Offset(cx, cy), 18, Paint()..color = const Color(0xFFE0F2EA));
-
-    // Stars
-    final r = Random(55);
-    for (int i = 0; i < 55; i++) {
-      final b = (sin(t * pi * 2 + r.nextDouble() * 6) + 1) / 2;
-      canvas.drawCircle(
-        Offset(r.nextDouble() * sz.width, r.nextDouble() * sz.height * 0.48),
-        0.5 + r.nextDouble() * 0.9,
-        Paint()..color = Colors.white.withOpacity(b * 0.55 * r.nextDouble()),
-      );
-    }
-
-    // Trees — 3 layers
-    for (final layer in [
-      (0.72, 0.15, const Color(0xFF0B1E14), 20, 6),
-      (0.80, 0.20, const Color(0xFF071410), 16, 8),
-      (0.87, 0.26, const Color(0xFF040C08), 12, 12),
-    ]) {
-      final lr = Random(layer.$5);
-      final p = Paint()..color = layer.$3;
-      final step = sz.width / layer.$4;
-      for (int i = 0; i < layer.$4; i++) {
-        final x = i * step + lr.nextDouble() * step * 0.6;
-        final h = sz.height * layer.$2 * (0.6 + lr.nextDouble() * 0.7);
-        final w = h * (0.24 + lr.nextDouble() * 0.1);
-        final yb = sz.height * layer.$1;
-        canvas.drawPath(
-            Path()
-              ..moveTo(x, yb - h)
-              ..lineTo(x - w / 2, yb)
-              ..lineTo(x + w / 2, yb)
-              ..close(),
-            p);
-        canvas.drawPath(
-            Path()
-              ..moveTo(x, yb - h * .70)
-              ..lineTo(x - w * .60, yb - h * .27)
-              ..lineTo(x + w * .60, yb - h * .27)
-              ..close(),
-            p);
-        canvas.drawPath(
-            Path()
-              ..moveTo(x, yb - h * .43)
-              ..lineTo(x - w * .43, yb - h * .10)
-              ..lineTo(x + w * .43, yb - h * .10)
-              ..close(),
-            p);
-      }
-    }
-
-    canvas.drawRect(
-        Rect.fromLTWH(0, sz.height * 0.90, sz.width, sz.height * 0.10),
-        Paint()..color = const Color(0xFF020A04));
-
-    // Mist
-    for (final m in [(0.64, 0.06, 25.0), (0.74, 0.04, 18.0)]) {
-      final y = sz.height * m.$1;
-      canvas.drawRect(
-          Rect.fromLTWH(0, y - 28, sz.width, 56),
-          Paint()
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, m.$3)
-            ..shader = LinearGradient(colors: [
-              Colors.transparent,
-              const Color(0xFF5A9A78).withOpacity(m.$2),
-              Colors.transparent,
-            ]).createShader(Rect.fromLTWH(0, y - 28, sz.width, 56)));
-    }
-
-    // Fireflies
-    final fr = Random(33);
-    for (int i = 0; i < 12; i++) {
-      final phase = fr.nextDouble() * 2 * pi;
-      final b = (sin(t * pi * 3 + phase) + 1) / 2;
-      if (b < 0.28) continue;
-      final fx = fr.nextDouble() * sz.width;
-      final fy = sz.height * 0.44 + fr.nextDouble() * sz.height * 0.36;
-      final dx = 6.0 * sin(t * pi * 2 + phase);
-      final dy = 4.0 * cos(t * pi * 1.8 + phase);
-      canvas.drawCircle(
-          Offset(fx + dx, fy + dy),
-          5,
-          Paint()
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5)
-            ..color = const Color(0xFF9AFF50).withOpacity(b * 0.30));
-      canvas.drawCircle(Offset(fx + dx, fy + dy), 1.5,
-          Paint()..color = const Color(0xFFC8FF88).withOpacity(b * 0.88));
-    }
-
-    // Vignette
-    canvas.drawRect(
-        Offset.zero & sz,
-        Paint()
-          ..shader = RadialGradient(
-            center: Alignment.center,
-            radius: 0.80,
-            colors: [Colors.transparent, Colors.black.withOpacity(0.72)],
-          ).createShader(Offset.zero & sz));
-  }
-
-  @override
-  bool shouldRepaint(_SettingsBgPainter old) => old.t != t;
-}

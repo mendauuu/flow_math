@@ -74,24 +74,49 @@ class MathProblem {
 //  ProblemGenerator — smarter, parameterised per difficulty band
 // ─────────────────────────────────────────────────────────────────────────────
 class ProblemGenerator {
-  static final _rng = Random();
+  static Random _rng = Random();
 
   /// Generate a problem at [difficulty] (1–10), optionally biasing toward
   /// a specific [weakTypeKey] (spaced-repetition re-exposure).
-  static MathProblem generate(int difficulty, {String? weakTypeKey}) {
+  /// [allowed] limits the operation types (topic practice); null/empty = all.
+  static MathProblem generate(
+    int difficulty, {
+    String? weakTypeKey,
+    Set<Operation>? allowed,
+  }) {
     difficulty = difficulty.clamp(1, 10);
+    final only = (allowed == null || allowed.isEmpty) ? null : allowed;
 
     // If we have a weak type key, 40% chance to drill it
     if (weakTypeKey != null && _rng.nextDouble() < 0.40) {
       final op = _opFromKey(weakTypeKey);
-      if (op != null) return _build(op, difficulty);
+      if (op != null && (only == null || only.contains(op))) {
+        return _build(op, difficulty);
+      }
     }
 
-    final op = _pickOp(difficulty);
-    return _build(op, difficulty);
+    return _build(_pickOp(difficulty, only), difficulty);
   }
 
-  static Operation _pickOp(int d) {
+  /// Today's challenge: the same [count] problems for everyone on [day],
+  /// ramping gently from easy to hard.
+  static List<MathProblem> dailySet(DateTime day, {int count = 15}) {
+    final saved = _rng;
+    _rng = Random(day.year * 10000 + day.month * 100 + day.day);
+    try {
+      return [
+        for (var i = 0; i < count; i++)
+          () {
+            final level = 2 + (i * 6 / (count - 1)).round();
+            return _build(_pickOp(level, null), level);
+          }(),
+      ];
+    } finally {
+      _rng = saved;
+    }
+  }
+
+  static Operation _pickOp(int d, Set<Operation>? allowed) {
     // Each band unlocks more operation types
     final pool = <Operation>[];
 
@@ -105,6 +130,15 @@ class ProblemGenerator {
     if (d >= 6) pool.add(Operation.percentOf);
     if (d >= 7) pool.addAll([Operation.doubleStep, Operation.sqrtOf]);
     if (d >= 8) pool.addAll([Operation.doubleStep, Operation.doubleStep]);
+
+    if (allowed != null) {
+      // Prefer chosen topics that are unlocked at this level; if none are
+      // yet (e.g. only square roots at level 1), use the topics anyway.
+      final unlocked = pool.where(allowed.contains).toList();
+      if (unlocked.isNotEmpty) return unlocked[_rng.nextInt(unlocked.length)];
+      final chosen = allowed.toList();
+      return chosen[_rng.nextInt(chosen.length)];
+    }
 
     return pool[_rng.nextInt(pool.length)];
   }
@@ -274,11 +308,11 @@ class ProblemGenerator {
       correctAnswer: answer,
       difficultyLevel: d,
       hint: pct == 10
-          ? 'Divide by 10: ${base} ÷ 10.'
+          ? 'Divide by 10: $base ÷ 10.'
           : pct == 25
-              ? 'Divide by 4: ${base} ÷ 4.'
+              ? 'Divide by 4: $base ÷ 4.'
               : pct == 50
-                  ? 'Divide by 2: ${base} ÷ 2.'
+                  ? 'Divide by 2: $base ÷ 2.'
                   : '$pct% = $pct ÷ 100 × $base.',
       typeKey: Operation.percentOf.name,
     );
@@ -330,28 +364,34 @@ class ExplanationEngine {
     switch (p.operation) {
       case Operation.add:
         if (off == 1) return 'Almost! Off by 1. Check the units column.';
-        if (wrong == p.a - p.b)
+        if (wrong == p.a - p.b) {
           return 'You subtracted — this is addition. ${p.a} + ${p.b} = $right';
-        if (wrong == right - 10 || wrong == right + 10)
+        }
+        if (wrong == right - 10 || wrong == right + 10) {
           return 'Carry/borrow error. ${p.a} + ${p.b} = $right';
+        }
         return '${p.a} + ${p.b} = $right';
 
       case Operation.subtract:
-        if (wrong == p.b - p.a)
+        if (wrong == p.b - p.a) {
           return 'You reversed the order. ${p.a} − ${p.b} = $right';
+        }
         if (off == 1) return 'Almost! Off by 1 — check the borrowing.';
         return '${p.a} − ${p.b} = $right';
 
       case Operation.multiply:
-        if (wrong == p.a + p.b)
+        if (wrong == p.a + p.b) {
           return 'You added instead of multiplying. ${p.a} × ${p.b} = $right';
-        if (wrong == p.a * (p.b - 1))
+        }
+        if (wrong == p.a * (p.b - 1)) {
           return 'Off by one group — forgot to add the last ${p.a}.';
+        }
         return '${p.a} × ${p.b} = $right  (${p.a} groups of ${p.b})';
 
       case Operation.divide:
-        if (wrong == p.a * p.b)
+        if (wrong == p.a * p.b) {
           return 'You multiplied instead of dividing. ${p.a} ÷ ${p.b} = $right';
+        }
         return 'Ask: ${p.b} × ? = ${p.a}.  Answer: $right';
 
       case Operation.missingAdd:

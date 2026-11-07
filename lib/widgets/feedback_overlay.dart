@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../theme/palette.dart';
+
 import '../services/session_service.dart';
 import '../utils/app_theme.dart';
 
@@ -20,6 +22,8 @@ class FeedbackOverlay extends StatefulWidget {
 
 class _FeedbackOverlayState extends State<FeedbackOverlay>
     with SingleTickerProviderStateMixin {
+  Palette get pal => context.palette;
+
   late AnimationController _ctrl;
   late Animation<double> _scale;
   late Animation<double> _fade;
@@ -29,7 +33,7 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 450),
+      duration: Duration(milliseconds: 450),
     )..forward();
     _scale = CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut);
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
@@ -58,7 +62,7 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
         child: Container(
           height: 44,
           width: double.infinity,
-          color: AppColors.correct.withOpacity(0.06),
+          color: AppColors.correct.withValues(alpha: 0.06),
         ),
       );
     }
@@ -69,13 +73,13 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
       opacity: _fade,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              cfg.color.withOpacity(0.0),
-              cfg.color.withOpacity(0.12),
-              cfg.color.withOpacity(0.0)
+              cfg.color.withValues(alpha: 0.0),
+              cfg.color.withValues(alpha: 0.12),
+              cfg.color.withValues(alpha: 0.0)
             ],
           ),
         ),
@@ -85,8 +89,8 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(cfg.emoji, style: const TextStyle(fontSize: 18)),
-                const SizedBox(width: 8),
+                Text(cfg.emoji, style: TextStyle(fontSize: 18)),
+                SizedBox(width: 8),
                 Text(cfg.label,
                     style: TextStyle(
                       fontSize: 14,
@@ -109,28 +113,28 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
       opacity: _fade,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(24, 10, 24, 10),
-        color: AppColors.incorrect.withOpacity(0.05),
+        padding: EdgeInsets.fromLTRB(24, 10, 24, 10),
+        color: AppColors.incorrect.withValues(alpha: 0.05),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.info_outline,
+            Icon(Icons.info_outline,
                 size: 14, color: AppColors.incorrect),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(lines[0],
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColors.textMid, height: 1.4)),
+                      style: TextStyle(
+                          fontSize: 13, color: pal.textMid, height: 1.4)),
                   if (lines.length > 1) ...[
-                    const SizedBox(height: 3),
+                    SizedBox(height: 3),
                     Text(lines[1],
                         style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.primary.withOpacity(0.7),
+                          color: pal.accent.withValues(alpha: 0.7),
                           height: 1.4,
                         )),
                   ],
@@ -145,17 +149,17 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
 
   // ── Reward configs ─────────────────────────────────────────────────────────
   _RewardCfg _rewardConfig(RewardEvent r) => switch (r) {
-        RewardEvent.streakThree => _RewardCfg('💫', 'NICE', AppColors.primary),
-        RewardEvent.streakFive => _RewardCfg('✨', 'FLOWING', AppColors.primary),
-        RewardEvent.streakTen => _RewardCfg('⚡', 'ON FIRE', AppColors.gold),
+        RewardEvent.streakThree => _RewardCfg('💫', 'NICE', pal.accent),
+        RewardEvent.streakFive => _RewardCfg('✨', 'FLOWING', pal.accent),
+        RewardEvent.streakTen => _RewardCfg('⚡', 'ON FIRE', pal.warm),
         RewardEvent.streakTwenty =>
-          _RewardCfg('🔥', 'UNSTOPPABLE', const Color(0xFFFF7043)),
+          _RewardCfg('🔥', 'UNSTOPPABLE', Color(0xFFFF7043)),
         RewardEvent.personalBest =>
-          _RewardCfg('🏆', 'PERSONAL BEST', AppColors.gold),
+          _RewardCfg('🏆', 'PERSONAL BEST', pal.warm),
         RewardEvent.speedBonus =>
-          _RewardCfg('⚡', 'LIGHTNING', const Color(0xFFB3E5FC)),
-        RewardEvent.levelUp => _RewardCfg('↑', 'LEVEL UP', AppColors.primary),
-        _ => _RewardCfg('', '', AppColors.primary),
+          _RewardCfg('⚡', 'LIGHTNING', Color(0xFFB3E5FC)),
+        RewardEvent.levelUp => _RewardCfg('↑', 'LEVEL UP', pal.accent),
+        _ => _RewardCfg('', '', pal.accent),
       };
 }
 
